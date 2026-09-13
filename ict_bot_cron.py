@@ -331,4 +331,7 @@ def run_once():
 
 
 if __name__ == "__main__":
-    run_once()
+    if os.environ.get("TEST_MESSAGE", "nein").strip().lower() in ("ja", "yes", "true", "1"):
+        send_discord(f"✅ Testnachricht vom ICT-Bot — Discord-Verbindung funktioniert! ({now_str()})")
+    else:
+        run_once()
