@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICT 5m Signal Chart</title>
+<style>
+  :root{
+    --bg:#10141c; --panel:#161c27; --line:#232b3a; --text:#e7eaf0; --muted:#8993a6;
+    --bull:#3fb68b; --bear:#e0665a; --amber:#e8b75d;
+    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);padding:16px 14px 40px;}
+  h1{font-size:17px;font-weight:600;margin:0 0 2px;}
+  .sub{color:var(--muted);font-size:12.5px;margin:0 0 16px;}
+  .tabs{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .tab{font-size:13px;font-weight:600;padding:8px 14px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--muted);cursor:pointer;}
+  .tab.active{color:var(--text);border-color:var(--amber);}
+  .price-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+  .price{font-family:var(--mono);font-size:20px;}
+  .bias{font-size:12.5px;color:var(--muted);}
+  .bias.bullish{color:var(--bull);} .bias.bearish{color:var(--bear);}
+  canvas{width:100%;height:220px;display:block;border:1px solid var(--line);border-radius:10px;background:var(--panel);}
+  .legend{display:flex;gap:14px;margin:10px 0 22px;flex-wrap:wrap;font-family:var(--mono);font-size:11.5px;color:var(--muted);}
+  .legend span{display:flex;align-items:center;gap:5px;}
+  .dot{width:8px;height:8px;border-radius:2px;display:inline-block;}
+  .section-title{font-size:12.5px;color:var(--muted);margin:0 0 10px;}
+  .feed{border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+  .signal{display:flex;gap:11px;padding:12px 13px;border-bottom:1px solid var(--line);}
+  .signal:last-child{border-bottom:none;}
+  .bar{width:3px;border-radius:2px;flex-shrink:0;}
+  .bar.LONG{background:var(--bull);} .bar.SHORT{background:var(--bear);}
+  .sig-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+  .sig-dir{font-weight:700;font-size:13px;}
+  .sig-dir.LONG{color:var(--bull);} .sig-dir.SHORT{color:var(--bear);}
+  .sig-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-family:var(--mono);font-size:12px;}
+  .sig-grid div span{display:block;color:var(--muted);font-size:10px;margin-bottom:1px;}
+  .sig-meta{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-top:6px;display:flex;gap:12px;flex-wrap:wrap;}
+  .pill{font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:20px;align-self:flex-start;}
+  .pill.OPEN{background:rgba(232,183,93,0.15);color:var(--amber);}
+  .pill.WIN{background:rgba(63,182,139,0.15);color:var(--bull);}
+  .pill.LOSS{background:rgba(224,102,90,0.15);color:var(--bear);}
+  .empty{padding:22px 16px;text-align:center;color:var(--muted);font-size:13px;}
+  .note{margin-top:22px;font-size:11.5px;color:var(--muted);line-height:1.5;border-top:1px solid var(--line);padding-top:14px;}
+</style>
+</head>
+<body>
+  <h1>ICT 5m Signal Chart</h1>
+  <p class="sub">BTCUSDT · ETHUSDT · SOLUSDT — Liquidity Sweep + Break of Structure + FVG / Order Block / OTE</p>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="price-row">
+    <span class="price" id="price">—</span>
+    <span class="bias" id="bias">—</span>
+  </div>
+  <canvas id="chart" width="700" height="220"></canvas>
+  <div class="legend" id="legend"></div>
+
+  <div class="section-title">Signale</div>
+  <div class="feed" id="feed"></div>
+
+  <div class="note">
+    Vereinfachte, heuristische Umsetzung von ICT-Konzepten (Liquidity Sweep, Break of Structure/CHoCH,
+    Fair Value Gap, Order Block, Optimal Trade Entry). Kursdaten live von Binance, direkt im Browser
+    geladen. "Gefunden" zeigt den Zeitpunkt, zu dem der Bot das Setup entdeckt hat; "Entry-Kerze" ist
+    die 5m-Kerze, auf der das Signal ausgelöst wurde. Keine Anlageberatung — Setups immer selbst prüfen.
+  </div>
+
+<script>
+const SYMBOLS = ["BTCUSDT","ETHUSDT","SOLUSDT"];
+const KLINE_HOSTS = ["https://data-api.binance.vision","https://api.binance.com"];
+const params = new URLSearchParams(location.search);
+let activeSymbol = params.get('symbol') || SYMBOLS[0];
+let liveCandles = {};
+let liveBias = {};
+let signals = [];
+
+function fmt(n){
+  if(n>=1000) return n.toLocaleString('de-DE',{maximumFractionDigits:2});
+  return n.toLocaleString('de-DE',{maximumFractionDigits:4});
+}
+
+async function fetchKlines(symbol){
+  for(const host of KLINE_HOSTS){
+    try{
+      const res = await fetch(`${host}/api/v3/klines?symbol=${symbol}&interval=5m&limit=100`);
+      if(!res.ok) continue;
+      const raw = await res.json();
+      const candles = raw.map(k=>({openTime:k[0], open:+k[1], high:+k[2], low:+k[3], close:+k[4]}));
+      candles.pop();
+      return candles;
+    }catch(e){ continue; }
+  }
+  return [];
+}
+
+function findSwings(candles, n=2){
+  const highs=[], lows=[];
+  for(let i=n;i<candles.length-n;i++){
+    let isHigh=true, isLow=true;
+    for(let j=i-n;j<=i+n;j++){
+      if(j===i) continue;
+      if(candles[j].high>candles[i].high) isHigh=false;
+      if(candles[j].low<candles[i].low) isLow=false;
+    }
+    if(isHigh) highs.push(candles[i].high);
+    if(isLow) lows.push(candles[i].low);
+  }
+  return {highs, lows};
+}
+function biasFromSwings(highs, lows){
+  if(highs.length<2||lows.length<2) return 'neutral';
+  const h1=highs[highs.length-2], h2=highs[highs.length-1];
+  const l1=lows[lows.length-2], l2=lows[lows.length-1];
+  if(h2>h1 && l2>l1) return 'bullish';
+  if(h2<h1 && l2<l1) return 'bearish';
+  return 'neutral';
+}
+
+async function loadSignals(){
+  try{
+    const res = await fetch('signals.json?_=' + Date.now());
+    const data = await res.json();
+    signals = data.signals || [];
+  }catch(e){ signals = []; }
+}
+
+function renderTabs(){
+  document.getElementById('tabs').innerHTML = SYMBOLS.map(s=>
+    `<div class="tab ${s===activeSymbol?'active':''}" onclick="selectSymbol('${s}')">${s}</div>`
+  ).join('');
+}
+function selectSymbol(s){
+  activeSymbol = s;
+  const url = new URL(location);
+  url.searchParams.set('symbol', s);
+  history.replaceState(null,'',url);
+  renderTabs();
+  renderAll();
+}
+window.selectSymbol = selectSymbol;
+
+function latestSignal(sym){
+  const list = signals.filter(s=>s.symbol===sym);
+  return list.find(s=>s.status==='OPEN') || list[0] || null;
+}
+
+function drawChart(canvas, candles, signal){
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  ctx.clearRect(0,0,w,h);
+  if(!candles.length) return;
+  let min = Math.min(...candles.map(c=>c.low));
+  let max = Math.max(...candles.map(c=>c.high));
+  if(signal){ min = Math.min(min, signal.sl, signal.tp, signal.entry); max = Math.max(max, signal.sl, signal.tp, signal.entry); }
+  const pad = (max-min)*0.08 || max*0.001;
+  min -= pad; max += pad;
+  const range = max-min || 1;
+  const priceToY = p => h - ((p-min)/range)*h;
+  const n = candles.length, cw = w/n, bodyW = Math.max(1, cw*0.6);
+
+  if(signal && signal.zone){
+    const yTop = priceToY(signal.zone.high), yBot = priceToY(signal.zone.low);
+    ctx.fillStyle = signal.direction==='LONG' ? 'rgba(63,182,139,0.12)' : 'rgba(224,102,90,0.12)';
+    ctx.fillRect(0, yTop, w, Math.max(1, yBot-yTop));
+  }
+  candles.forEach((c,i)=>{
+    const x = i*cw + cw/2;
+    const bull = c.close >= c.open;
+    ctx.strokeStyle = ctx.fillStyle = bull ? '#3fb68b' : '#e0665a';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, priceToY(c.high)); ctx.lineTo(x, priceToY(c.low)); ctx.stroke();
+    const yO = priceToY(c.open), yC = priceToY(c.close);
+    ctx.fillRect(x-bodyW/2, Math.min(yO,yC), bodyW, Math.max(1, Math.abs(yC-yO)));
+  });
+  if(signal){
+    [{price:signal.entry,color:'#e8b75d'},{price:signal.sl,color:'#e0665a'},{price:signal.tp,color:'#3fb68b'}].forEach(l=>{
+      const y = priceToY(l.price);
+      ctx.strokeStyle = l.color; ctx.setLineDash([4,3]); ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); ctx.setLineDash([]);
+    });
+  }
+}
+
+function renderAll(){
+  const candles = liveCandles[activeSymbol] || [];
+  const last = candles[candles.length-1];
+  document.getElementById('price').textContent = last ? fmt(last.close) : '—';
+  const biasEl = document.getElementById('bias');
+  const bias = liveBias[activeSymbol] || 'neutral';
+  biasEl.textContent = bias==='bullish' ? 'bullische Struktur' : bias==='bearish' ? 'bärische Struktur' : 'neutral / Range';
+  biasEl.className = 'bias ' + bias;
+
+  const sig = latestSignal(activeSymbol);
+  drawChart(document.getElementById('chart'), candles.slice(-60), sig);
+
+  document.getElementById('legend').innerHTML = sig ? `
+    <span><i class="dot" style="background:#e8b75d"></i>Entry ${fmt(sig.entry)}</span>
+    <span><i class="dot" style="background:#e0665a"></i>SL ${fmt(sig.sl)}</span>
+    <span><i class="dot" style="background:#3fb68b"></i>TP ${fmt(sig.tp)}</span>
+    <span>${sig.direction} · ${sig.type} · ${sig.status}</span>
+  ` : '';
+
+  const feed = document.getElementById('feed');
+  const list = signals.filter(s=>s.symbol===activeSymbol);
+  if(!list.length){
+    feed.innerHTML = `<div class="empty">Noch keine Setups für ${activeSymbol}.</div>`;
+  } else {
+    feed.innerHTML = list.map(s=>{
+      const entryTime = new Date(s.entryTime).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const foundAt = s.foundAt || '—';
+      return `<div class="signal">
+        <div class="bar ${s.direction}"></div>
+        <div style="flex:1;min-width:0;">
+          <div class="sig-top">
+            <span class="sig-dir ${s.direction}">${s.direction} · ${s.type}</span>
+            <span class="pill ${s.status}">${s.status}</span>
+          </div>
+          <div class="sig-grid">
+            <div><span>Entry</span>${fmt(s.entry)}</div>
+            <div><span>SL</span>${fmt(s.sl)}</div>
+            <div><span>TP</span>${fmt(s.tp)}</div>
+            <div><span>RR</span>${s.rr.toFixed(2)}</div>
+          </div>
+          <div class="sig-meta">
+            <span>Gefunden: ${foundAt}</span>
+            <span>Entry-Kerze: ${entryTime}</span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+}
+
+async function refreshLive(){
+  for(const sym of SYMBOLS){
+    const candles = await fetchKlines(sym);
+    if(candles.length){
+      liveCandles[sym] = candles;
+      const {highs, lows} = findSwings(candles);
+      liveBias[sym] = biasFromSwings(highs, lows);
+    }
+  }
+  renderAll();
+}
+
+async function init(){
+  renderTabs();
+  await loadSignals();
+  await refreshLive();
+  setInterval(refreshLive, 30000);
+  setInterval(loadSignals, 60000);
+}
+init();
+</script>
+</body>
+</html>
