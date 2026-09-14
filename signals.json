@@ -14,7 +14,7 @@
       },
       "id": "ETHUSDT-LONG-OB-1789376700000",
       "entryTime": 1789382100000,
-      "status": "OPEN",
+      "status": "WIN",
       "foundAt": "2026-09-14 10:43:43 UTC"
     },
     {
@@ -563,8 +563,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789382399999,
-    "ETHUSDT": 1789382399999,
-    "SOLUSDT": 1789382399999
+    "BTCUSDT": 1789382999999,
+    "ETHUSDT": 1789382999999,
+    "SOLUSDT": 1789382999999
   }
 }
