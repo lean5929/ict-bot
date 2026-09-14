@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-ICT 5m Signal Bot - GitHub Actions Cron-Variante.
+ICT Multi-Timeframe Signal Bot - GitHub Actions Cron-Variante.
 
-Fuehrt EINEN Durchlauf aus: Kursdaten holen -> ICT-Setups suchen (Liquidity
-Sweep + Break of Structure, dann Einstieg per Fair Value Gap / Order Block /
-Optimal Trade Entry) -> bei neuem Setup eine Discord-Nachricht schicken ->
-Zustand in signals.json speichern -> beenden.
+Signal nur wenn ALLE drei Bedingungen zusammenkommen:
+  1. Bias auf dem 4H-Chart (Daily-Bias-Ersatz) ist bullisch oder baerisch
+  2. Liquidity Sweep auf dem 1H-Chart in Richtung des Bias
+  3. Break of Structure auf dem 5m-Chart NACH dem 1H-Sweep, in Bias-Richtung
 
-Wird von .github/workflows/ict-bot.yml automatisch alle 5 Minuten gestartet.
+Fuehrt EINEN Durchlauf aus und beendet sich. Wird von
+.github/workflows/ict-bot.yml automatisch alle 5 Minuten gestartet.
 Kein eigener Server noetig.
 """
 
@@ -25,7 +26,11 @@ SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
 BUFFER_PCT = 0.0015
 STATE_FILE = "signals.json"
 SWING_N = 2
-LOOKBACK_CANDLES = 40
+
+BIAS_INTERVAL = "4h"     # Alternativ: "1d" fuer reinen Daily-Bias
+SWEEP_INTERVAL = "1h"
+LTF_INTERVAL = "5m"      # Alternativ: "15m"
+SWEEP_LOOKBACK = 30      # wie viele 1H-Kerzen zurueck nach einem Sweep gesucht wird
 
 # oeffentliche Marktdaten-Adresse zuerst (nicht geo-gesperrt), dann Fallbacks
 KLINE_HOSTS = [
@@ -52,8 +57,8 @@ def send_discord(text: str):
 
 
 # ---------- Marktdaten ----------
-def fetch_klines(symbol: str):
-    params = {"symbol": symbol, "interval": "5m", "limit": 150}
+def fetch_klines(symbol: str, interval: str, limit: int = 150):
+    params = {"symbol": symbol, "interval": interval, "limit": limit}
     last_error = None
     for host in KLINE_HOSTS:
         try:
@@ -72,7 +77,7 @@ def fetch_klines(symbol: str):
     raise last_error
 
 
-# ---------- ICT-Logik ----------
+# ---------- Struktur / Swings ----------
 def find_swings(candles, n=SWING_N):
     highs, lows = [], []
     for i in range(n, len(candles) - n):
@@ -85,166 +90,137 @@ def find_swings(candles, n=SWING_N):
     return highs, lows
 
 
-def find_fvg_in_range(candles, frm, to, direction):
-    for i in range(max(frm + 1, 2), to + 1):
-        a, c = candles[i - 2], candles[i]
-        if direction == "LONG" and a["high"] < c["low"]:
-            return {"low": a["high"], "high": c["low"]}
-        if direction == "SHORT" and a["low"] > c["high"]:
-            return {"low": c["high"], "high": a["low"]}
-    return None
+def bias_from_swings(highs, lows):
+    if len(highs) < 2 or len(lows) < 2:
+        return "neutral"
+    h1, h2 = highs[-2], highs[-1]
+    l1, l2 = lows[-2], lows[-1]
+    if h2["price"] > h1["price"] and l2["price"] > l1["price"]:
+        return "bullish"
+    if h2["price"] < h1["price"] and l2["price"] < l1["price"]:
+        return "bearish"
+    return "neutral"
 
 
-def find_last_opposite_candle(candles, frm, to, direction):
-    for k in range(to, frm - 1, -1):
-        c = candles[k]
-        if direction == "LONG" and c["close"] < c["open"]:
-            return c
-        if direction == "SHORT" and c["close"] > c["open"]:
-            return c
-    return None
+# ---------- Schritt 1: HTF-Bias ----------
+def get_bias(symbol):
+    candles = fetch_klines(symbol, BIAS_INTERVAL, limit=120)
+    if len(candles) < 20:
+        return "neutral"
+    highs, lows = find_swings(candles)
+    return bias_from_swings(highs, lows)
 
 
-def find_impulse_extreme(candles, frm, to, want_high):
-    vals = [c["high" if want_high else "low"] for c in candles[frm:to + 1]]
-    return max(vals) if want_high else min(vals)
-
-
-def find_bullish_event(candles, highs, lows, look_start):
+# ---------- Schritt 2: 1H Liquidity Sweep ----------
+def find_1h_sweep(symbol, bias):
+    candles = fetch_klines(symbol, SWEEP_INTERVAL, limit=150)
+    if len(candles) < 20:
+        return None
+    highs, lows = find_swings(candles)
     n = len(candles)
-    for li in range(len(lows) - 1, 0, -1):
-        swing_low = lows[li]
-        if swing_low["idx"] < look_start:
-            break
-        for i in range(swing_low["idx"] + 1, n):
-            c = candles[i]
-            if c["low"] < swing_low["price"] and c["close"] > swing_low["price"]:
-                ref_candidates = [h for h in highs if swing_low["idx"] - 5 < h["idx"] <= i]
-                ref_high = ref_candidates[-1] if ref_candidates else (highs[-1] if highs else None)
-                if not ref_high:
-                    continue
-                for j in range(i, n):
-                    if candles[j]["close"] > ref_high["price"]:
-                        return {"sweep_idx": i, "bos_idx": j, "sweep_candle": c}
-    return None
+    look_start = max(0, n - SWEEP_LOOKBACK)
+
+    if bias == "bullish":
+        for li in range(len(lows) - 1, 0, -1):
+            swing_low = lows[li]
+            if swing_low["idx"] < look_start:
+                break
+            for i in range(swing_low["idx"] + 1, n):
+                c = candles[i]
+                if c["low"] < swing_low["price"] and c["close"] > swing_low["price"]:
+                    opposing = [h["price"] for h in highs if h["idx"] > swing_low["idx"]]
+                    return {"price": c["low"], "time": c["closeTime"], "opposing": opposing}
+        return None
+    else:
+        for hi in range(len(highs) - 1, 0, -1):
+            swing_high = highs[hi]
+            if swing_high["idx"] < look_start:
+                break
+            for i in range(swing_high["idx"] + 1, n):
+                c = candles[i]
+                if c["high"] > swing_high["price"] and c["close"] < swing_high["price"]:
+                    opposing = [l["price"] for l in lows if l["idx"] > swing_high["idx"]]
+                    return {"price": c["high"], "time": c["closeTime"], "opposing": opposing}
+        return None
 
 
-def find_bearish_event(candles, highs, lows, look_start):
-    n = len(candles)
-    for hi in range(len(highs) - 1, 0, -1):
-        swing_high = highs[hi]
-        if swing_high["idx"] < look_start:
-            break
-        for i in range(swing_high["idx"] + 1, n):
-            c = candles[i]
-            if c["high"] > swing_high["price"] and c["close"] < swing_high["price"]:
-                ref_candidates = [l for l in lows if swing_high["idx"] - 5 < l["idx"] <= i]
-                ref_low = ref_candidates[-1] if ref_candidates else (lows[-1] if lows else None)
-                if not ref_low:
-                    continue
-                for j in range(i, n):
-                    if candles[j]["close"] < ref_low["price"]:
-                        return {"sweep_idx": i, "bos_idx": j, "sweep_candle": c}
-    return None
+# ---------- Schritt 3: LTF Break of Structure ----------
+def find_ltf_bos(ltf_candles_after_sweep, bias):
+    """Gibt nur ein Ergebnis zurueck, wenn der Break GENAU auf der letzten
+    (aktuellsten) Kerze passiert ist -- verhindert doppelte Signale bei
+    wiederholten Laeufen fuer denselben, bereits vergangenen Break."""
+    n = len(ltf_candles_after_sweep)
+    if n < 6:
+        return None
+    highs, lows = find_swings(ltf_candles_after_sweep)
+
+    if bias == "bullish":
+        if not highs:
+            return None
+        ref = highs[0]
+        for j in range(ref["idx"] + 1, n):
+            if ltf_candles_after_sweep[j]["close"] > ref["price"]:
+                if j == n - 1:
+                    return {"entry": ltf_candles_after_sweep[j]["close"]}
+                return None
+        return None
+    else:
+        if not lows:
+            return None
+        ref = lows[0]
+        for j in range(ref["idx"] + 1, n):
+            if ltf_candles_after_sweep[j]["close"] < ref["price"]:
+                if j == n - 1:
+                    return {"entry": ltf_candles_after_sweep[j]["close"]}
+                return None
+        return None
 
 
-def make_setup(symbol, direction, setup_type, sl_basis, entry, opposing_prices, zone):
-    sl = sl_basis * (1 - BUFFER_PCT) if direction == "LONG" else sl_basis * (1 + BUFFER_PCT)
+# ---------- Zusammenfuehren ----------
+def build_setup(symbol, direction, entry, sweep_price, opposing):
     if direction == "LONG":
-        targets = sorted([p for p in opposing_prices if p > entry])
+        sl = sweep_price * (1 - BUFFER_PCT)
+        targets = sorted([p for p in opposing if p > entry])
         tp = targets[0] if targets else entry + 2 * (entry - sl)
         risk = entry - sl
+        rr = (tp - entry) / risk if risk > 0 else 0
     else:
-        targets = sorted([p for p in opposing_prices if p < entry], reverse=True)
+        sl = sweep_price * (1 + BUFFER_PCT)
+        targets = sorted([p for p in opposing if p < entry], reverse=True)
         tp = targets[0] if targets else entry - 2 * (sl - entry)
         risk = sl - entry
-    if risk <= 0:
-        return None
-    rr = (tp - entry) / risk if direction == "LONG" else (entry - tp) / risk
+        rr = (entry - tp) / risk if risk > 0 else 0
     if rr <= 0:
         return None
-    return {"symbol": symbol, "direction": direction, "type": setup_type,
-            "entry": entry, "sl": sl, "tp": tp, "rr": rr, "zone": zone}
+    return {"symbol": symbol, "direction": direction, "type": "MTF",
+            "entry": entry, "sl": sl, "tp": tp, "rr": rr}
 
 
-def detect_setups(symbol, candles):
-    results = []
-    highs, lows = find_swings(candles)
-    if len(highs) < 3 or len(lows) < 3:
-        return results
-    n = len(candles)
-    look_start = max(0, n - LOOKBACK_CANDLES)
-    current = candles[-1]
+def detect_mtf_setup(symbol, ltf_candles):
+    bias = get_bias(symbol)
+    if bias == "neutral":
+        return None
 
-    bull = find_bullish_event(candles, highs, lows, look_start)
-    if bull:
-        i, j, c = bull["sweep_idx"], bull["bos_idx"], bull["sweep_candle"]
-        sweep_low = c["low"]
-        if current["close"] > sweep_low:
-            opposing = [h["price"] for h in highs]
+    sweep = find_1h_sweep(symbol, bias)
+    if not sweep:
+        return None
 
-            fvg = find_fvg_in_range(candles, i, j, "LONG")
-            if fvg and fvg["low"] <= current["close"] <= fvg["high"]:
-                s = make_setup(symbol, "LONG", "FVG", sweep_low, current["close"], opposing,
-                                {"low": fvg["low"], "high": fvg["high"]})
-                if s:
-                    s.update(id=f"{symbol}-LONG-FVG-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
+    after = [c for c in ltf_candles if c["openTime"] >= sweep["time"]]
+    bos = find_ltf_bos(after, bias)
+    if not bos:
+        return None
 
-            ob = find_last_opposite_candle(candles, i, j, "LONG")
-            if ob and ob["low"] <= current["close"] <= ob["high"]:
-                s = make_setup(symbol, "LONG", "OB", ob["low"], current["close"], opposing,
-                                {"low": ob["low"], "high": ob["high"]})
-                if s:
-                    s.update(id=f"{symbol}-LONG-OB-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
+    direction = "LONG" if bias == "bullish" else "SHORT"
+    setup = build_setup(symbol, direction, bos["entry"], sweep["price"], sweep["opposing"])
+    if not setup:
+        return None
 
-            impulse_high = find_impulse_extreme(candles, i, j, True)
-            rng = impulse_high - sweep_low
-            ote_high = impulse_high - 0.618 * rng
-            ote_low = impulse_high - 0.79 * rng
-            if rng > 0 and ote_low <= current["close"] <= ote_high:
-                s = make_setup(symbol, "LONG", "OTE", sweep_low, current["close"], opposing,
-                                {"low": ote_low, "high": ote_high})
-                if s:
-                    s.update(id=f"{symbol}-LONG-OTE-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
-
-    bear = find_bearish_event(candles, highs, lows, look_start)
-    if bear:
-        i, j, c = bear["sweep_idx"], bear["bos_idx"], bear["sweep_candle"]
-        sweep_high = c["high"]
-        if current["close"] < sweep_high:
-            opposing = [l["price"] for l in lows]
-
-            fvg = find_fvg_in_range(candles, i, j, "SHORT")
-            if fvg and fvg["low"] <= current["close"] <= fvg["high"]:
-                s = make_setup(symbol, "SHORT", "FVG", sweep_high, current["close"], opposing,
-                                {"low": fvg["low"], "high": fvg["high"]})
-                if s:
-                    s.update(id=f"{symbol}-SHORT-FVG-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
-
-            ob = find_last_opposite_candle(candles, i, j, "SHORT")
-            if ob and ob["low"] <= current["close"] <= ob["high"]:
-                s = make_setup(symbol, "SHORT", "OB", ob["high"], current["close"], opposing,
-                                {"low": ob["low"], "high": ob["high"]})
-                if s:
-                    s.update(id=f"{symbol}-SHORT-OB-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
-
-            impulse_low = find_impulse_extreme(candles, i, j, False)
-            rng = sweep_high - impulse_low
-            ote_low = impulse_low + 0.618 * rng
-            ote_high = impulse_low + 0.79 * rng
-            if rng > 0 and ote_low <= current["close"] <= ote_high:
-                s = make_setup(symbol, "SHORT", "OTE", sweep_high, current["close"], opposing,
-                                {"low": ote_low, "high": ote_high})
-                if s:
-                    s.update(id=f"{symbol}-SHORT-OTE-{c['openTime']}", entryTime=current["openTime"])
-                    results.append(s)
-
-    return results
+    current = ltf_candles[-1]
+    setup["id"] = f"{symbol}-{direction}-MTF-{sweep['time']}-{current['openTime']}"
+    setup["entryTime"] = current["openTime"]
+    setup["zone"] = None
+    setup["bias"] = bias
+    return setup
 
 
 def evaluate_outcome(sig, candles):
@@ -268,7 +244,6 @@ def fmt(n):
 
 
 def now_str():
-    """Zeitstempel, wann ein Setup vom Bot gefunden wurde (nicht die Kerzenzeit)."""
     return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
 
@@ -291,21 +266,22 @@ def run_once():
     state = load_state()
     for symbol in SYMBOLS:
         try:
-            candles = fetch_klines(symbol)
-            if len(candles) < 40:
+            ltf_candles = fetch_klines(symbol, LTF_INTERVAL, limit=200)
+            if len(ltf_candles) < 50:
                 continue
 
-            last_closed_time = candles[-1]["closeTime"]
+            last_closed_time = ltf_candles[-1]["closeTime"]
             if state["last_closed"].get(symbol) != last_closed_time:
                 state["last_closed"][symbol] = last_closed_time
-                for setup in detect_setups(symbol, candles):
-                    if any(s["id"] == setup["id"] for s in state["signals"]):
-                        continue
+                setup = detect_mtf_setup(symbol, ltf_candles)
+                if setup and not any(s["id"] == setup["id"] for s in state["signals"]):
                     setup["status"] = "OPEN"
                     setup["foundAt"] = now_str()
                     state["signals"].insert(0, setup)
+                    bias_label = "bullisch" if setup["bias"] == "bullish" else "bärisch"
                     msg = (
-                        f"{setup['direction']} {setup['symbol']} · {setup['type']}\n"
+                        f"{setup['direction']} {setup['symbol']} · MTF-Setup\n"
+                        f"4H-Bias: {bias_label} · 1H-Sweep + {LTF_INTERVAL}-BOS bestätigt\n"
                         f"Entry: {fmt(setup['entry'])}\n"
                         f"SL: {fmt(setup['sl'])}\n"
                         f"TP: {fmt(setup['tp'])}\n"
@@ -319,10 +295,10 @@ def run_once():
 
             for sig in state["signals"]:
                 if sig["symbol"] == symbol and sig["status"] == "OPEN":
-                    outcome = evaluate_outcome(sig, candles)
+                    outcome = evaluate_outcome(sig, ltf_candles)
                     if outcome != "OPEN":
                         sig["status"] = outcome
-                        send_discord(f"{sig['direction']} {sig['symbol']} ({sig['type']}) -> {outcome}")
+                        send_discord(f"{sig['direction']} {sig['symbol']} (MTF) -> {outcome}")
 
         except Exception as e:
             log.error("Fehler bei %s: %s", symbol, e)
