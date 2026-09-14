@@ -14,7 +14,7 @@
       },
       "id": "BTCUSDT-SHORT-OTE-1789398000000",
       "entryTime": 1789401900000,
-      "status": "OPEN",
+      "status": "LOSS",
       "foundAt": "2026-09-14 16:13:47 UTC"
     },
     {
@@ -852,8 +852,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789402199999,
-    "ETHUSDT": 1789402199999,
-    "SOLUSDT": 1789402199999
+    "BTCUSDT": 1789403099999,
+    "ETHUSDT": 1789403099999,
+    "SOLUSDT": 1789403099999
   }
 }
