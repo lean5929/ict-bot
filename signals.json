@@ -2,6 +2,91 @@
   "signals": [
     {
       "symbol": "SOLUSDT",
+      "direction": "SHORT",
+      "type": "OTE",
+      "entry": 101.56,
+      "sl": 101.822505,
+      "tp": 101.45,
+      "rr": 0.4190396373402319,
+      "zone": {
+        "low": 101.54012,
+        "high": 101.5986
+      },
+      "id": "SOLUSDT-SHORT-OTE-1789383900000",
+      "entryTime": 1789387800000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 12:17:05 UTC"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "direction": "SHORT",
+      "type": "OB",
+      "entry": 101.56,
+      "sl": 101.782445,
+      "tp": 101.45,
+      "rr": 0.4945042594798837,
+      "zone": {
+        "low": 101.53,
+        "high": 101.63
+      },
+      "id": "SOLUSDT-SHORT-OB-1789383900000",
+      "entryTime": 1789387800000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 12:17:04 UTC"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "type": "OB",
+      "entry": 2512.13,
+      "sl": 2518.3017950000003,
+      "tp": 2511.5,
+      "rr": 0.10207727249529328,
+      "zone": {
+        "low": 2510.74,
+        "high": 2514.53
+      },
+      "id": "ETHUSDT-SHORT-OB-1789379700000",
+      "entryTime": 1789387800000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 12:17:03 UTC"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "direction": "SHORT",
+      "type": "OB",
+      "entry": 77831.35,
+      "sl": 77966.36438500001,
+      "tp": 77718.0,
+      "rr": 0.8395401719602245,
+      "zone": {
+        "low": 77789.01,
+        "high": 77849.59
+      },
+      "id": "BTCUSDT-SHORT-OB-1789385400000",
+      "entryTime": 1789387800000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 12:17:02 UTC"
+    },
+    {
+      "symbol": "BTCUSDT",
+      "direction": "SHORT",
+      "type": "FVG",
+      "entry": 77831.35,
+      "sl": 78036.890015,
+      "tp": 77718.0,
+      "rr": 0.5514741253668322,
+      "zone": {
+        "low": 77828.01,
+        "high": 77864.0
+      },
+      "id": "BTCUSDT-SHORT-FVG-1789385400000",
+      "entryTime": 1789387800000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 12:17:02 UTC"
+    },
+    {
+      "symbol": "SOLUSDT",
       "direction": "LONG",
       "type": "FVG",
       "entry": 101.55,
@@ -614,8 +699,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789386899999,
-    "ETHUSDT": 1789386899999,
-    "SOLUSDT": 1789386899999
+    "BTCUSDT": 1789388099999,
+    "ETHUSDT": 1789388099999,
+    "SOLUSDT": 1789388099999
   }
 }
