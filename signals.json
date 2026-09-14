@@ -4,6 +4,91 @@
       "symbol": "SOLUSDT",
       "direction": "SHORT",
       "type": "OTE",
+      "entry": 99.6,
+      "sl": 100.07989500000001,
+      "tp": 99.54,
+      "rr": 0.1250273497327257,
+      "zone": {
+        "low": 99.57474,
+        "high": 99.7347
+      },
+      "id": "SOLUSDT-SHORT-OTE-1789344300000",
+      "entryTime": 1789346100000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 00:41:23 UTC"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "direction": "SHORT",
+      "type": "OB",
+      "entry": 99.6,
+      "sl": 99.859565,
+      "tp": 99.54,
+      "rr": 0.23115597249238515,
+      "zone": {
+        "low": 99.55,
+        "high": 99.71
+      },
+      "id": "SOLUSDT-SHORT-OB-1789344300000",
+      "entryTime": 1789346100000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 00:41:22 UTC"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "type": "OTE",
+      "entry": 2481.07,
+      "sl": 2490.0895400000004,
+      "tp": 2475.0,
+      "rr": 0.6729833228745598,
+      "zone": {
+        "low": 2478.0897,
+        "high": 2481.8135
+      },
+      "id": "ETHUSDT-SHORT-OTE-1789345200000",
+      "entryTime": 1789346100000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 00:41:21 UTC"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "type": "FVG",
+      "entry": 2481.07,
+      "sl": 2490.0895400000004,
+      "tp": 2475.0,
+      "rr": 0.6729833228745598,
+      "zone": {
+        "low": 2478.58,
+        "high": 2483.04
+      },
+      "id": "ETHUSDT-SHORT-FVG-1789345200000",
+      "entryTime": 1789346100000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 00:41:21 UTC"
+    },
+    {
+      "symbol": "ETHUSDT",
+      "direction": "LONG",
+      "type": "OB",
+      "entry": 2481.07,
+      "sl": 2471.9564950000004,
+      "tp": 2481.48,
+      "rr": 0.04498817963010535,
+      "zone": {
+        "low": 2475.67,
+        "high": 2481.8
+      },
+      "id": "ETHUSDT-LONG-OB-1789341600000",
+      "entryTime": 1789346100000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 00:41:21 UTC"
+    },
+    {
+      "symbol": "SOLUSDT",
+      "direction": "SHORT",
+      "type": "OTE",
       "entry": 101.37,
       "sl": 101.562115,
       "tp": 101.33,
@@ -53,8 +138,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789345199999,
-    "ETHUSDT": 1789345199999,
-    "SOLUSDT": 1789345199999
+    "BTCUSDT": 1789346399999,
+    "ETHUSDT": 1789346399999,
+    "SOLUSDT": 1789346399999
   }
 }
