@@ -14,7 +14,7 @@
       },
       "id": "BTCUSDT-SHORT-FVG-1789367100000",
       "entryTime": 1789368600000,
-      "status": "OPEN",
+      "status": "WIN",
       "foundAt": "2026-09-14 06:56:32 UTC"
     },
     {
@@ -359,8 +359,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789368899999,
-    "ETHUSDT": 1789368899999,
-    "SOLUSDT": 1789368899999
+    "BTCUSDT": 1789369799999,
+    "ETHUSDT": 1789369799999,
+    "SOLUSDT": 1789369799999
   }
 }
