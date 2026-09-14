@@ -14,7 +14,7 @@
       },
       "id": "SOLUSDT-SHORT-OTE-1789383900000",
       "entryTime": 1789387800000,
-      "status": "OPEN",
+      "status": "LOSS",
       "foundAt": "2026-09-14 12:17:05 UTC"
     },
     {
@@ -31,7 +31,7 @@
       },
       "id": "SOLUSDT-SHORT-OB-1789383900000",
       "entryTime": 1789387800000,
-      "status": "OPEN",
+      "status": "LOSS",
       "foundAt": "2026-09-14 12:17:04 UTC"
     },
     {
@@ -48,7 +48,7 @@
       },
       "id": "ETHUSDT-SHORT-OB-1789379700000",
       "entryTime": 1789387800000,
-      "status": "OPEN",
+      "status": "WIN",
       "foundAt": "2026-09-14 12:17:03 UTC"
     },
     {
@@ -65,7 +65,7 @@
       },
       "id": "BTCUSDT-SHORT-OB-1789385400000",
       "entryTime": 1789387800000,
-      "status": "OPEN",
+      "status": "LOSS",
       "foundAt": "2026-09-14 12:17:02 UTC"
     },
     {
@@ -82,7 +82,7 @@
       },
       "id": "BTCUSDT-SHORT-FVG-1789385400000",
       "entryTime": 1789387800000,
-      "status": "OPEN",
+      "status": "LOSS",
       "foundAt": "2026-09-14 12:17:02 UTC"
     },
     {
@@ -99,7 +99,7 @@
       },
       "id": "SOLUSDT-LONG-FVG-1789377300000",
       "entryTime": 1789386000000,
-      "status": "OPEN",
+      "status": "WIN",
       "foundAt": "2026-09-14 11:48:17 UTC"
     },
     {
@@ -699,8 +699,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789388099999,
-    "ETHUSDT": 1789388099999,
-    "SOLUSDT": 1789388099999
+    "BTCUSDT": 1789389299999,
+    "ETHUSDT": 1789389299999,
+    "SOLUSDT": 1789389299999
   }
 }
