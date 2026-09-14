@@ -1,6 +1,23 @@
 {
   "signals": [
     {
+      "symbol": "ETHUSDT",
+      "direction": "SHORT",
+      "type": "FVG",
+      "entry": 2519.29,
+      "sl": 2536.709365,
+      "tp": 2518.59,
+      "rr": 0.04018516174382993,
+      "zone": {
+        "low": 2518.66,
+        "high": 2521.58
+      },
+      "id": "ETHUSDT-SHORT-FVG-1789374300000",
+      "entryTime": 1789377900000,
+      "status": "OPEN",
+      "foundAt": "2026-09-14 09:34:55 UTC"
+    },
+    {
       "symbol": "SOLUSDT",
       "direction": "SHORT",
       "type": "OB",
@@ -461,8 +478,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789377299999,
-    "ETHUSDT": 1789377299999,
-    "SOLUSDT": 1789377299999
+    "BTCUSDT": 1789378199999,
+    "ETHUSDT": 1789378199999,
+    "SOLUSDT": 1789378199999
   }
 }
