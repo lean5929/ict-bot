@@ -12,7 +12,7 @@
       "entryTime": 1789429800000,
       "zone": null,
       "bias": "bearish",
-      "status": "OPEN",
+      "status": "WIN",
       "foundAt": "2026-09-14 23:56:11 UTC"
     },
     {
@@ -918,8 +918,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1789448399999,
-    "ETHUSDT": 1789448399999,
-    "SOLUSDT": 1789448399999
+    "BTCUSDT": 1789449599999,
+    "ETHUSDT": 1789449599999,
+    "SOLUSDT": 1789449599999
   }
 }
