@@ -2,6 +2,21 @@
   "signals": [
     {
       "symbol": "BTCUSDT",
+      "direction": "SHORT",
+      "type": "MTF",
+      "entry": 84344.0,
+      "sl": 84845.09703,
+      "tp": 83948.43,
+      "rr": 0.7894079915021717,
+      "id": "BTCUSDT-SHORT-MTF-1790297999999-1790304300000",
+      "entryTime": 1790304300000,
+      "zone": null,
+      "bias": "bearish",
+      "status": "OPEN",
+      "foundAt": "2026-09-25 02:50:21 UTC"
+    },
+    {
+      "symbol": "BTCUSDT",
       "direction": "LONG",
       "type": "MTF",
       "entry": 81362.75,
@@ -978,8 +993,8 @@
     }
   ],
   "last_closed": {
-    "BTCUSDT": 1790303699999,
-    "ETHUSDT": 1790303699999,
-    "SOLUSDT": 1790303699999
+    "BTCUSDT": 1790304599999,
+    "ETHUSDT": 1790304599999,
+    "SOLUSDT": 1790304599999
   }
 }
